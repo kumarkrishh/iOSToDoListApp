@@ -9,21 +9,41 @@ import FirebaseFirestore
 import Foundation
 
 class ProfileViewViewModel: ObservableObject {
-    init() {}
+    @Published var user: User? = nil
     
-    func toggleIsDone(item: ToDoListItem) {
-        var itemCopy = item
-        itemCopy.setDone(!item.isDone)
-        
-        guard let uid = Auth.auth().currentUser?.uid else {
+    init() {
+    }
+    
+    func fetchUser() {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("No user logged in")
             return
         }
         
         let db = Firestore.firestore()
-        db.collection("users")
-            .document(uid)
-            .collection("todos")
-            .document(itemCopy.id)
-            .setData(itemCopy.asDictionary())
+        db.collection("users").document(userId).getDocument { [weak self] snapshot, error in
+            if let error = error {
+                print("Firestore error: \(error.localizedDescription)")
+                return
+            }
+            guard let data = snapshot?.data() else {
+                print("No data found for user")
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self?.user = User(
+                    id: data["id"] as? String ?? "",
+                    name: data["name"] as? String ?? "",
+                    email: data["email"] as? String ?? "",
+                    joined: data["joined"] as? TimeInterval ?? 0
+                )
+            }
+        }
+    }
+    
+    func logOut() {
+        try? Auth.auth().signOut()
+        user = nil
     }
 }
